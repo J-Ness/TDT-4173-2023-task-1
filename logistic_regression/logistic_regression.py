@@ -6,12 +6,13 @@ import pandas as pd
 
 class LogisticRegression:
     
-    def __init__():
+    def __init__(self,y):
         # NOTE: Feel free add any hyperparameters 
         # (with defaults) as you see fit
-        pass
+        self.weights = []
+        self.bias = []
         
-    def fit(self, X, y):
+    def fit(self, X, y, learning_rate, iterations):
         """
         Estimates parameters for the classifier
         
@@ -21,9 +22,36 @@ class LogisticRegression:
             y (array<m>): a vector of floats containing 
                 m binary 0.0/1.0 labels
         """
-        # TODO: Implement
-        raise NotImplemented()
-    
+        self.y_true = y
+        cost_history = []
+        n_features = X.shape[1]  # Change from X.shape[0] to X.shape[1]
+        m_samples = X.shape[0]  # Change from X.shape[1] to X.shape[0]
+
+        weights = np.zeros((n_features, 1))
+        B = 0
+
+        # Reshape y to match A's shape
+        y = y.values.reshape(m_samples, 1)
+
+        for i in range(iterations):
+            Z = np.dot(X, weights) + B  # Swap X and weights in dot product
+            A = sigmoid(Z)
+
+            cost = -(1 / m_samples) * np.sum(y * np.log(A) + (1 - y) * np.log(1 - A))
+            dWeights = (1 / m_samples) * np.dot(X.T, A - y)  # Swap X and A in dot product
+            dB = (1 / m_samples) * np.sum(A - y)
+
+            weights = weights - learning_rate * dWeights
+            B = B - learning_rate * dB
+            cost_history.append(cost)
+
+            if (i % (iterations / 10) == 0):
+                print('cost after iteration {}: {}'.format(i, cost))
+
+        self.weights = weights
+        self.bias = B
+
+        
     def predict(self, X):
         """
         Generates predictions
@@ -38,9 +66,8 @@ class LogisticRegression:
             A length m array of floats in the range [0, 1]
             with probability-like predictions
         """
-        # TODO: Implement
-        raise NotImplemented()
-        
+        Z = np.dot(X, self.weights) + self.bias  # Swap self.weights and X in dot product
+        return sigmoid(Z).flatten()
 
         
 # --- Some utility functions 
@@ -56,6 +83,8 @@ def binary_accuracy(y_true, y_pred, threshold=0.5):
     Returns:
         The average number of correct predictions
     """
+    if len(y_pred.shape) == 2 and y_pred.shape[1] == 1:
+        y_pred = y_pred.flatten()
     assert y_true.shape == y_pred.shape
     y_pred_thresholded = (y_pred >= threshold).astype(float)
     correct_predictions = y_pred_thresholded == y_true 
@@ -65,6 +94,7 @@ def binary_accuracy(y_true, y_pred, threshold=0.5):
 def binary_cross_entropy(y_true, y_pred, eps=1e-15):
     """
     Computes binary cross entropy 
+    (Minimizing this is equivalent to maximizing the likelihood of the predictions)
     
     Args:
         y_true (array<m>): m 0/1 floats with ground truth labels

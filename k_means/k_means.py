@@ -6,22 +6,51 @@ import pandas as pd
 
 class KMeans:
     
-    def __init__():
+    def __init__(self, n_centroids):
         # NOTE: Feel free add any hyperparameters 
         # (with defaults) as you see fit
-        pass
-        
-    def fit(self, X):
+        self.n_centroids = n_centroids
+        self.centroids = None 
+
+    def fit(self, X, max_iters = 2000):
         """
         Estimates parameters for the classifier
         
         Args:
             X (array<m,n>): a matrix of floats with
                 m rows (#samples) and n columns (#features)
-        """
-        # TODO: Implement
-        raise NotImplemented()
-    
+        """        
+        # Initialize cluster centers randomly or using a specific initialization method
+        n_samples, n_features = X.shape
+        self.centroids = np.random.uniform(np.amin(X,axis=0), np.amax(X,axis=0), size=(self.n_centroids, X.shape[1]))
+        for _ in range(max_iters):
+            list_of_labels = []
+            # Assign each data point to the nearest cluster
+            for row in X.itertuples(index=True, name='Pandas'):           
+                distances = euclidean_distance((row.x0,row.x1), self.centroids)
+                labels = np.argmin(distances)
+                list_of_labels.append(labels)
+            list_of_labels = np.array(list_of_labels)
+
+            # Update cluster centers by computing the mean of data points in each cluster
+            cluster_indecies = []
+            for i in range(self.n_centroids):
+                cluster_indecies.append(np.where(list_of_labels == i)[0])
+            cluster_centers = []
+
+            for i, indecies in enumerate(cluster_indecies):
+                if len(indecies) == 0:
+                    cluster_centers.append(self.centroids[i])
+                else:
+                    cluster_centers.append(np.mean(X.iloc[indecies], axis=0))
+            
+            if np.max(self.centroids - np.array(cluster_centers)) < 0.0001:
+                break
+            else:
+                self.centroids = np.array(cluster_centers)
+
+        return list_of_labels
+
     def predict(self, X):
         """
         Generates predictions
@@ -38,9 +67,8 @@ class KMeans:
             there are 3 clusters, then a possible assignment
             could be: array([2, 0, 0, 1, 2, 1, 1, 0, 2, 2])
         """
-        # TODO: Implement 
-        raise NotImplemented()
-    
+        pass
+
     def get_centroids(self):
         """
         Returns the centroids found by the K-mean algorithm
@@ -56,10 +84,17 @@ class KMeans:
             [xm_1, xm_2, ..., xm_n]
         ])
         """
-        pass
+        return self.centroids
     
+    def scale_data(self, X):
+
+        X_norm = (X-X.min())/(X.max()-X.min())
+
+        return X_norm
     
-    
+
+
+
     
 # --- Some utility functions 
 
@@ -111,7 +146,7 @@ def euclidean_distortion(X, z):
     for i, c in enumerate(clusters):
         Xc = X[z == c]
         mu = Xc.mean(axis=0)
-        distortion += ((Xc - mu) ** 2).sum(axis=1)
+        distortion += ((Xc - mu) ** 2).sum()
         
     return distortion
 
