@@ -6,13 +6,15 @@ import pandas as pd
 
 class KMeans:
     
-    def __init__(self, n_centroids):
+    def __init__(self, n_centroids, max_iters=100):
         # NOTE: Feel free add any hyperparameters 
         # (with defaults) as you see fit
         self.n_centroids = n_centroids
         self.centroids = None 
+        self.max_iters = max_iters
+        
 
-    def fit(self, X, max_iters = 2000):
+    def fit(self, X):
         """
         Estimates parameters for the classifier
         
@@ -22,34 +24,40 @@ class KMeans:
         """        
         # Initialize cluster centers randomly or using a specific initialization method
         n_samples, n_features = X.shape
-        self.centroids = np.random.uniform(np.amin(X,axis=0), np.amax(X,axis=0), size=(self.n_centroids, X.shape[1]))
-        for _ in range(max_iters):
-            list_of_labels = []
-            # Assign each data point to the nearest cluster
-            for row in X.itertuples(index=True, name='Pandas'):           
-                distances = euclidean_distance((row.x0,row.x1), self.centroids)
-                labels = np.argmin(distances)
-                list_of_labels.append(labels)
-            list_of_labels = np.array(list_of_labels)
+        M = X.values
+                
+        centroid_indices = np.random.choice(n_samples, 1, replace=False)
+        self.centroids = M[centroid_indices]
+        min_distance_threshold = 0.22
 
-            # Update cluster centers by computing the mean of data points in each cluster
-            cluster_indecies = []
-            for i in range(self.n_centroids):
-                cluster_indecies.append(np.where(list_of_labels == i)[0])
-            cluster_centers = []
+        print(self.centroids)
+        print(M)
 
-            for i, indecies in enumerate(cluster_indecies):
-                if len(indecies) == 0:
-                    cluster_centers.append(self.centroids[i])
-                else:
-                    cluster_centers.append(np.mean(X.iloc[indecies], axis=0))
-            
-            if np.max(self.centroids - np.array(cluster_centers)) < 0.0001:
-                break
-            else:
-                self.centroids = np.array(cluster_centers)
+        for _ in range(self.n_centroids - 1):
+            distances = np.zeros(n_samples)
+            for c in self.centroids:
+                distances += np.linalg.norm(M - c, axis=1) ** 2  # Accumulate distances
 
-        return list_of_labels
+            min_distances = np.min(distances)  # Find the minimum distance
+            probabilities = distances / np.sum(distances)  # Calculate probabilities
+
+            # Choose a new centroid, ensuring it's not too close to existing centroids
+            new_centroid_index = None
+            while new_centroid_index is None:
+                potential_index = np.random.choice(n_samples, p=probabilities)
+                potential_centroid = M[potential_index]
+                min_distance_to_existing = np.min(np.linalg.norm(self.centroids - potential_centroid, axis=1))
+                
+                # Set a threshold for the minimum distance to avoid very close centroids
+                if min_distance_to_existing >= min_distance_threshold:
+                    new_centroid_index = potential_index
+
+            self.centroids = np.append(self.centroids, M[new_centroid_index]).reshape(-1, n_features)
+
+        self.centroids = np.array(self.centroids)
+
+
+
 
     def predict(self, X):
         """
@@ -67,7 +75,34 @@ class KMeans:
             there are 3 clusters, then a possible assignment
             could be: array([2, 0, 0, 1, 2, 1, 1, 0, 2, 2])
         """
-        pass
+        for _ in range(self.max_iters):
+            list_of_labels = []
+            # Assign each data point to the nearest cluster
+            for row in X.itertuples(index=True, name='Pandas'):           
+                distances = euclidean_distance((row.x0,row.x1), self.centroids)
+                labels = np.argmin(distances)
+                list_of_labels.append(labels)
+            list_of_labels = np.array(list_of_labels)
+
+            # Update cluster centers by computing the mean of data points in each cluster
+            cluster_indecies = [np.where(list_of_labels == i)[0] for i in range(self.n_centroids)]
+            cluster_centers = []
+
+            for i, indecies in enumerate(cluster_indecies):
+                if len(indecies) == 0:
+                    cluster_centers.append(self.centroids[i])
+                else:
+                    cluster_centers.append(np.mean(X.iloc[indecies], axis=0))
+            
+            cluster_centers = np.array(cluster_centers)
+
+            # Check for convergence
+            if np.max(np.abs(self.centroids - cluster_centers)) < 0.0001:
+                break
+            else:
+                self.centroids = cluster_centers
+
+        return list_of_labels
 
     def get_centroids(self):
         """
